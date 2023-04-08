@@ -1,11 +1,34 @@
 #!/usr/bin/env python3
 import asyncio
 import argparse
+import yaml
 
 from bleak import BleakClient, BleakScanner
 from bleak.exc import BleakError
 
 import PIL.Image
+
+
+with open("config.yaml", "r") as f:
+    config = yaml.load(f, Loader=yaml.FullLoader)
+
+
+bluetooth_name = config["bluetooth_name"]
+print_contrast = config["contrast"]
+printer_width = config["printer_width"]
+img_print_speed = [0x23]
+blank_speed = [0x19]
+feed_lines = config["feed_lines"]
+header_lines = 0
+scale_feed = False
+packet_length = 60
+throttle = 0.01
+address = None
+device = None
+debug = False
+
+PrinterCharacteristic = "0000AE01-0000-1000-8000-00805F9B34FB"
+NotifyCharacteristic = "0000AE02-0000-1000-8000-00805F9B34FB"
 
 # CRC8 table extracted from APK, pretty standard though
 crc8_table = (
@@ -51,7 +74,8 @@ def crc8(data):
 # CRC8 of Data: 1 byte
 # 0xFF
 def format_message(command, data):
-    data = [0x51, 0x78] + [command] + [0x00] + [len(data)] + [0x00] + data + [crc8(data)] + [0xFF]
+    data = [0x51, 0x78] + [command] + [0x00] + \
+        [len(data)] + [0x00] + data + [crc8(data)] + [0xFF]
     return data
 
 
@@ -64,16 +88,20 @@ RetractPaper = 0xA0  # Data: Number of steps to go back
 FeedPaper = 0xA1  # Data: Number of steps to go forward
 DrawBitmap = 0xA2  # Data: Line to draw. 0 bit -> don't draw pixel, 1 bit -> draw pixel
 GetDevState = 0xA3  # Data: 0
-ControlLattice = 0xA6  # Data: Eleven bytes, all constants. One set used before printing, one after.
+# Data: Eleven bytes, all constants. One set used before printing, one after.
+ControlLattice = 0xA6
 GetDevInfo = 0xA8  # Data: 0
-OtherFeedPaper = 0xBD  # Data: one byte, set to a device-specific "Speed" value before printing
+# Data: one byte, set to a device-specific "Speed" value before printing
+OtherFeedPaper = 0xBD
 #                              and to 0x19 before feeding blank paper
 DrawingMode = 0xBE  # Data: 1 for Text, 0 for Images
 SetEnergy = 0xAF  # Data: 1 - 0xFFFF
 SetQuality = 0xA4  # Data: 0x31 - 0x35. APK always sets 0x33 for GB01
 
-PrintLattice = [0xAA, 0x55, 0x17, 0x38, 0x44, 0x5F, 0x5F, 0x5F, 0x44, 0x38, 0x2C]
-FinishLattice = [0xAA, 0x55, 0x17, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x17]
+PrintLattice = [0xAA, 0x55, 0x17, 0x38,
+                0x44, 0x5F, 0x5F, 0x5F, 0x44, 0x38, 0x2C]
+FinishLattice = [0xAA, 0x55, 0x17, 0x00,
+                 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x17]
 XOff = (0x51, 0x78, 0xAE, 0x01, 0x01, 0x00, 0x10, 0x70, 0xFF)
 XOn = (0x51, 0x78, 0xAE, 0x01, 0x01, 0x00, 0x00, 0x00, 0xFF)
 
@@ -82,27 +110,6 @@ energy = {
     1: printer_short(12000),
     2: printer_short(17500)
 }
-contrast = 1
-
-PrinterWidth = 384
-
-ImgPrintSpeed = [0x23]
-BlankSpeed = [0x19]
-
-feed_lines = 112
-header_lines = 0
-scale_feed = False
-
-packet_length = 60
-throttle = 0.01
-
-address = None
-PrinterCharacteristic = "0000AE01-0000-1000-8000-00805F9B34FB"
-NotifyCharacteristic = "0000AE02-0000-1000-8000-00805F9B34FB"
-device = None
-
-# show notification data
-debug = False
 
 
 def detect_printer(detected, advertisement_data):
@@ -111,20 +118,21 @@ def detect_printer(detected, advertisement_data):
         cut_addr = detected.address.replace(":", "")[-(len(address)):].upper()
         if cut_addr != address:
             return
-    if detected.name == 'GB01':
+    if detected.name == bluetooth_name:
         device = detected
 
 
 def notification_handler(sender, data):
     global debug
     if debug:
-        print("{0}: [ {1} ]".format(sender, " ".join("{:02X}".format(x) for x in data)))
+        print("{0}: [ {1} ]".format(sender, " ".join(
+            "{:02X}".format(x) for x in data)))
     if tuple(data) == XOff:
-        print("ERROR: printer data overrun!")
+        print("Error: Printer data overrun!")
         return
     if data[2] == GetDevState:
         if data[6] & 0b1000:
-            print("warning: low battery! print quality might be affected…")
+            print("Warning: Low battery! Print quality might be affected…")
         # print("printer status byte: {:08b}".format(data[6]))
         # xxxxxxx1 no_paper ("No paper.")
         # xxxxxx10 paper_positions_open ("Warehouse.")
@@ -166,11 +174,12 @@ def request_status():
 
 def blank_paper(lines):
     # Feed extra paper for image to be visible
-    blank_commands = format_message(OtherFeedPaper, BlankSpeed)
+    blank_commands = format_message(OtherFeedPaper, blank_speed)
     count = lines
     while count:
         feed = min(count, 0xFF)
-        blank_commands = blank_commands + format_message(FeedPaper, printer_short(feed))
+        blank_commands = blank_commands + \
+            format_message(FeedPaper, printer_short(feed))
         count = count - feed
     return blank_commands
 
@@ -185,34 +194,35 @@ def render_image(img):
     # start and/or set up the lattice, whatever that is
     cmdqueue += format_message(ControlLattice, PrintLattice)
     # Set energy used
-    cmdqueue += format_message(SetEnergy, energy[contrast])
+    cmdqueue += format_message(SetEnergy, energy[print_contrast])
     # Set mode to image mode
     cmdqueue += format_message(DrawingMode, [0])
     # not entirely sure what this does
-    cmdqueue += format_message(OtherFeedPaper, ImgPrintSpeed)
+    cmdqueue += format_message(OtherFeedPaper, img_print_speed)
 
-    if img.width > PrinterWidth:
+    if img.width > printer_width:
         # image is wider than printer resolution; scale it down proportionately
-        scale = PrinterWidth / img.width
+        scale = printer_width / img.width
         if scale_feed:
             header_lines = int(header_lines * scale)
             feed_lines = int(feed_lines * scale)
-        img = img.resize((PrinterWidth, int(img.height * scale)))
-    if img.width < (PrinterWidth // 2):
+        img = img.resize((printer_width, int(img.height * scale)))
+    if img.width < (printer_width // 2):
         # scale up to largest whole multiple
-        scale = PrinterWidth // img.width
+        scale = printer_width // img.width
         if scale_feed:
             header_lines = int(header_lines * scale)
             feed_lines = int(feed_lines * scale)
-        img = img.resize((img.width * scale, img.height * scale), resample=PIL.Image.NEAREST)
+        img = img.resize((img.width * scale, img.height *
+                         scale), resample=PIL.Image.NEAREST)
     # convert image to black-and-white 1bpp color format
     img = img.convert("RGB")
     img = img.convert("1")
-    if img.width < PrinterWidth:
+    if img.width < printer_width:
         # image is narrower than printer resolution
         # pad it out with white pixels
-        pad_amount = (PrinterWidth - img.width) // 2
-        padded_image = PIL.Image.new("1", (PrinterWidth, img.height), 1)
+        pad_amount = (printer_width - img.width) // 2
+        padded_image = PIL.Image.new("1", (printer_width, img.height), 1)
         padded_image.paste(img, box=(pad_amount, 0))
         img = padded_image
 
@@ -287,7 +297,7 @@ parser.add_argument("-p", "--packetsize", type=int, default=packet_length, metav
 args = parser.parse_args()
 debug = args.debug
 if args.contrast:
-    contrast = args.contrast
+    print_contrast = args.contrast
 if args.address:
     address = args.address.replace(':', '').upper()
 throttle = args.throttle
@@ -300,8 +310,33 @@ if args.scale_feed:
 print_data = request_status()
 if not args.eject:
     image = PIL.Image.open(args.filename)
-    print_data = print_data + render_image(image)
+
+    try:
+        # Removes alpha-channel and replaces it with white
+        canvas = PIL.Image.new('RGBA', image.size, (255, 255, 255, 255))
+        canvas.paste(image, mask=image)
+        print_data = print_data + render_image(canvas)
+    except:  # If image does not have alpha channel, PIL throws an error
+        print_data = print_data + render_image(image)
+
+
 if not args.no_eject:
     print_data = print_data + blank_paper(feed_lines)
 loop = asyncio.get_event_loop()
-loop.run_until_complete(connect_and_send(print_data))
+
+
+i = 1
+print_failed = False
+while i < 4:
+    try:
+        loop.run_until_complete(connect_and_send(print_data))
+        i = 4
+        print_failed = False
+        print("Printti onnistui :))")
+    except:
+        print(f"Warning: Printer not found, trying again... {i}")
+        i += 1
+        print_failed = True
+
+if print_failed == True:
+    print(f"Error: Printing failed, did you turn on the printer?")
