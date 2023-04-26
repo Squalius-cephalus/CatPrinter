@@ -260,34 +260,40 @@ def render_image(img, printing):
 def tulostus(filename):
 
     print_data = request_status()
-    if True:
-        image = PIL.Image.open(filename)
+    image = PIL.Image.open(filename)
 
-        try:
-            # Removes alpha-channel and replaces it with white
-            canvas = PIL.Image.new('RGBA', image.size, (255, 255, 255, 255))
-            canvas.paste(image, mask=image)
-            print_data = print_data + render_image(canvas, True)
-        except:  # If image does not have alpha channel, PIL throws an error
-            print_data = print_data + render_image(image, True)
+    try:
+        # Removes alpha-channel and replaces it with white
+        canvas = PIL.Image.new('RGBA', image.size, (255, 255, 255, 255))
+        canvas.paste(image, mask=image)
+        print_data = print_data + render_image(canvas, True)
+    except:  # If image does not have alpha channel, PIL throws an error
+        print_data = print_data + render_image(image, True)
+    print_data = print_data + blank_paper(feed_lines)
 
-    if True:
-        print_data = print_data + blank_paper(feed_lines)
+    return print_data
+
+    # loop = asyncio.get_event_loop()
+
+    # i = 1
+    # print_failed = False
+
+    # while i < 4:
+    #     try:
+    #         loop.run_until_complete(connect_and_send(print_data))
+    #         i = 4
+    #         print_failed = False
+    #         return "printti done :)"
+    #     except:
+    #         time.sleep(1)  # import time
+    #         print(f"Warning: Printer not found, trying again... {i}")
+    #         i += 1
+    #         print_failed = True
+
+    # if print_failed == True:
+    #     return "Emt, joku juttu meni rikki"
+
+
+def connecting(print_data):
     loop = asyncio.get_event_loop()
-
-    i = 1
-    print_failed = False
-    while i < 4:
-        try:
-            loop.run_until_complete(connect_and_send(print_data))
-            i = 4
-            print_failed = False
-            return "printti done :)"
-        except:
-            time.sleep(1)  # import time
-            print(f"Warning: Printer not found, trying again... {i}")
-            i += 1
-            print_failed = True
-
-    if print_failed == True:
-        return "Emt, joku juttu meni rikki"
+    loop.run_until_complete(connect_and_send(print_data))

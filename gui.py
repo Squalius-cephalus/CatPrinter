@@ -1,7 +1,8 @@
+import time
 from tkinter import *
+import tkinter as tk
 from PIL import ImageTk, Image
 from tkinter import filedialog
-import os
 import print2
 import tempfile
 
@@ -22,10 +23,6 @@ img = ImageTk.PhotoImage(default_img)
 def openfn():
     filename = filedialog.askopenfilename(title='open')
     return filename
-
-
-def test():
-    print(img)
 
 
 def save_temp_image(image):
@@ -58,19 +55,53 @@ def open_img():
     print(type(temp_path))
 
 
-btn = Button(root, text='open image', command=open_img)
+def PreparePrint():
+    global temp_path
+
+    data = print2.tulostus(temp_path)
+    set_status(f"Connecting to printer...")
+    ConnectingToPrinter(data)
+
+
+def ConnectingToPrinter(print_data):
+    print_failed = False
+    for i in range(1, 4):
+        try:
+            print2.connecting(print_data)
+            set_status(f"Printing done!")
+            break
+        except:
+            time.sleep(1)  # import time
+            set_status(f"Printer not found, trying again...{i}")
+        print_failed = True
+
+    if print_failed:
+        set_status(f"WARNING! Printer not found!")
+
+
+btn = Button(root, text='Open image', command=open_img)
 btn.pack()
 
 
-def tulosta():
-    global temp_path
-    print2.tulostus(temp_path)
+def update_status_label(text):
+    status_label.config(text=text)
+
+
+def set_status(status):
+    status_label.config(text=status)
+    status_label.update()
+
+
+status_label = tk.Label(root, text="Ready", bd=1,
+                        relief=tk.SUNKEN, anchor=tk.W)
+status_label.pack(side=tk.BOTTOM, fill=tk.X)
 
 
 panel = Label(root, image=img)
 panel.image = img
 panel.pack()
-btn2 = Button(root, text='print', command=tulosta)
+btn2 = Button(root, text='Print image', command=PreparePrint)
 btn2.pack(side='bottom')
+
 
 root.mainloop()
