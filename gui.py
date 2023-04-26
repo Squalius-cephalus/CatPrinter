@@ -8,7 +8,7 @@ import tempfile
 
 
 root = Tk()
-root.geometry("550x300+300+150")
+root.geometry("800x600")
 root.resizable(width=True, height=True)
 
 # Create a global variable to store the panel object
@@ -71,8 +71,9 @@ def ConnectingToPrinter(print_data):
             set_status(f"Printing done!")
             break
         except:
-            time.sleep(1)  # import time
             set_status(f"Printer not found, trying again...{i}")
+            time.sleep(1)  # import time
+
         print_failed = True
 
     if print_failed:
