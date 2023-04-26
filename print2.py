@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import asyncio
 import argparse
+import time
 import yaml
 
 from bleak import BleakClient, BleakScanner
@@ -184,9 +185,10 @@ def blank_paper(lines):
     return blank_commands
 
 
-def render_image(img):
+def render_image(img, printing):
     global header_lines
     global feed_lines
+    global print_contrast
 
     cmdqueue = []
     # Set quality to standard
@@ -249,94 +251,43 @@ def render_image(img):
     # finish the lattice, whatever that means
     cmdqueue += format_message(ControlLattice, FinishLattice)
 
-    return cmdqueue
+    if printing:
+        return cmdqueue
+    else:
+        return img
 
 
-parser = argparse.ArgumentParser(
-    description="Prints a given image to a GB01 thermal printer.")
-name_args = parser.add_mutually_exclusive_group(required=True)
-name_args.add_argument("filename", nargs='?',
-                       help="file name of an image to print")
-name_args.add_argument("-e", "--eject",
-                       help="don't print an image, just feed some blank paper",
-                       action="store_true")
-feed_args = parser.add_mutually_exclusive_group()
-feed_args.add_argument("-E", "--no-eject",
-                       help="don't feed blank paper after printing the image",
-                       action="store_true")
-feed_args.add_argument("-f", "--feed", type=int, default=feed_lines, metavar="LINES",
-                       help="amount of blank paper to feed (default: {})".format(feed_lines))
-parser.add_argument("--header", type=int, metavar="LINES",
-                    help="feed blank paper before printing the image")
-parser.add_argument("--scale-feed",
-                    help="adjust blank paper feed proportionately when resizing image",
-                    action="store_true")
-contrast_args = parser.add_mutually_exclusive_group()
-contrast_args.add_argument("-l", "--light",
-                           help="use less energy for light contrast",
-                           action="store_const", dest="contrast", const=0)
-contrast_args.add_argument("-m", "--medium",
-                           help="use moderate energy for moderate contrast",
-                           action="store_const", dest="contrast", const=1)
-contrast_args.add_argument("-d", "--dark",
-                           help="use more energy for high contrast",
-                           action="store_const", dest="contrast", const=2)
-parser.add_argument("-A", "--address",
-                    help="MAC address of printer in hex (rightmost digits, colons optional)")
-parser.add_argument("-D", "--debug",
-                    help="output notifications received from printer, in hex",
-                    action="store_true")
-throttle_args = parser.add_mutually_exclusive_group()
-throttle_args.add_argument("-t", "--throttle", type=float, default=throttle, metavar="SECONDS",
-                           help="delay between sending command queue packets (default: {})".format(throttle),)
-throttle_args.add_argument("-T", "--no-throttle",
-                           help="don't wait while sending data",
-                           action="store_const", dest="throttle", const=None)
-parser.add_argument("-p", "--packetsize", type=int, default=packet_length, metavar="BYTES",
-                    help="length of a command queue packet (default: {})".format(packet_length))
-args = parser.parse_args()
-debug = args.debug
-if args.contrast:
-    print_contrast = args.contrast
-if args.address:
-    address = args.address.replace(':', '').upper()
-throttle = args.throttle
-packet_length = args.packetsize
-feed_lines = args.feed
-header_lines = args.header
-if args.scale_feed:
-    scale_feed = True
+def tulostus(filename):
 
-print_data = request_status()
-if not args.eject:
-    image = PIL.Image.open(args.filename)
+    print_data = request_status()
+    if True:
+        image = PIL.Image.open(filename)
 
-    try:
-        # Removes alpha-channel and replaces it with white
-        canvas = PIL.Image.new('RGBA', image.size, (255, 255, 255, 255))
-        canvas.paste(image, mask=image)
-        print_data = print_data + render_image(canvas)
-    except:  # If image does not have alpha channel, PIL throws an error
-        print_data = print_data + render_image(image)
+        try:
+            # Removes alpha-channel and replaces it with white
+            canvas = PIL.Image.new('RGBA', image.size, (255, 255, 255, 255))
+            canvas.paste(image, mask=image)
+            print_data = print_data + render_image(canvas, True)
+        except:  # If image does not have alpha channel, PIL throws an error
+            print_data = print_data + render_image(image, True)
 
+    if True:
+        print_data = print_data + blank_paper(feed_lines)
+    loop = asyncio.get_event_loop()
 
-if not args.no_eject:
-    print_data = print_data + blank_paper(feed_lines)
-loop = asyncio.get_event_loop()
+    i = 1
+    print_failed = False
+    while i < 4:
+        try:
+            loop.run_until_complete(connect_and_send(print_data))
+            i = 4
+            print_failed = False
+            return "printti done :)"
+        except:
+            time.sleep(1)  # import time
+            print(f"Warning: Printer not found, trying again... {i}")
+            i += 1
+            print_failed = True
 
-
-i = 1
-print_failed = False
-while i < 4:
-    try:
-        loop.run_until_complete(connect_and_send(print_data))
-        i = 4
-        print_failed = False
-        print("Printti onnistui :))")
-    except:
-        print(f"Warning: Printer not found, trying again... {i}")
-        i += 1
-        print_failed = True
-
-if print_failed == True:
-    print(f"Error: Printing failed, did you turn on the printer?")
+    if print_failed == True:
+        return "Emt, joku juttu meni rikki"

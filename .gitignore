@@ -3,3 +3,8 @@ test.py
 test.JPG
 Untitled.png
 sticker.webp
+.DS_Store
+__pycache__/tulostin.cpython-311.pyc
+__pycache__/print2.cpython-311.pyc
+__pycache__/print.cpython-311.pyc
+__pycache__/gb01print.cpython-311.pyc
