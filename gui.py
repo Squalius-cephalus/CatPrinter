@@ -1,22 +1,26 @@
 import time
 from tkinter import *
 import tkinter as tk
-from PIL import ImageTk, Image
+from PIL import ImageTk, Image, ImageOps
 from tkinter import filedialog
 import print2
 import tempfile
-
+import yaml
+with open("config.yaml", "r") as f:
+    config = yaml.load(f, Loader=yaml.FullLoader)
+printer_width = config["printer_width"]
 
 root = Tk()
 root.geometry("800x600")
-root.resizable(width=True, height=True)
+root.resizable(width=False, height=False)
 
 # Create a global variable to store the panel object
 panel = None
 img = None
 temp_path = "Untitled.png"
 
-default_img = Image.new('RGB', (250, 250), color='gray')
+default_img = Image.new(
+    'RGB', (printer_width, printer_width), color='gray')
 img = ImageTk.PhotoImage(default_img)
 
 
@@ -43,8 +47,14 @@ def open_img():
     x = openfn()
     img = Image.open(x)
     img = print2.render_image(img, False)
+    mywidth = printer_width
+
+    wpercent = (mywidth/float(img.size[1]))
+    hsize = int((float(img.size[0])*float(wpercent)))
+    img = img.resize((hsize, mywidth), Image.ANTIALIAS)
     print(img)
     img = ImageTk.PhotoImage(img)
+
     if panel:  # If the panel object exists, destroy it
         panel.destroy()
     panel = Label(root, image=img)
