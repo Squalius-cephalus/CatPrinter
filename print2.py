@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import asyncio
-import argparse
-import time
+
+
 import yaml
 
 from bleak import BleakClient, BleakScanner
@@ -272,26 +272,6 @@ def tulostus(filename):
     print_data = print_data + blank_paper(feed_lines)
 
     return print_data
-
-    # loop = asyncio.get_event_loop()
-
-    # i = 1
-    # print_failed = False
-
-    # while i < 4:
-    #     try:
-    #         loop.run_until_complete(connect_and_send(print_data))
-    #         i = 4
-    #         print_failed = False
-    #         return "printti done :)"
-    #     except:
-    #         time.sleep(1)  # import time
-    #         print(f"Warning: Printer not found, trying again... {i}")
-    #         i += 1
-    #         print_failed = True
-
-    # if print_failed == True:
-    #     return "Emt, joku juttu meni rikki"
 
 
 def connecting(print_data):

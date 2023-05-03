@@ -24,6 +24,46 @@ default_img = Image.new(
 img = ImageTk.PhotoImage(default_img)
 
 
+def save_settings(device_name, contrast, feed_lines, printer_width):
+
+    # Yes, this is not good way to do this.
+    config["bluetooth_name"] = device_name
+
+    with open("config.yaml", "w") as new_file:
+        yaml.dump(config, new_file)
+
+
+def open_settingswindow():
+    settings_window = tk.Toplevel()
+
+    tk.Label(settings_window, text="Device name").grid(row=0)
+    tk.Label(settings_window, text="Contrast").grid(row=1)
+    tk.Label(settings_window, text="Feed lines").grid(row=2)
+    tk.Label(settings_window, text="Printer width").grid(row=3)
+
+    device_name = tk.Entry(settings_window)
+    device_name.insert(0, config["bluetooth_name"])
+    contrast = tk.Entry(settings_window)
+    contrast.insert(0, config["contrast"])
+    feed_lines = tk.Entry(settings_window)
+    feed_lines.insert(0, config["feed_lines"])
+    printer_width = tk.Entry(settings_window)
+    printer_width.insert(0, config["printer_width"])
+
+    save_button = tk.Button(
+        settings_window, text="Save", command=lambda: save_settings(device_name.get(), contrast.get(), feed_lines.get(), printer_width.get()))
+    exit_button = tk.Button(settings_window, text="Exit",
+                            command=settings_window.destroy)
+
+    device_name.grid(row=0, column=1)
+    contrast.grid(row=1, column=1)
+    feed_lines.grid(row=2, column=1)
+    printer_width.grid(row=3, column=1)
+
+    save_button.grid(row=4, column=0)
+    exit_button.grid(row=4, column=1)
+
+
 def openfn():
     filename = filedialog.askopenfilename(title='open')
     return filename
@@ -92,6 +132,9 @@ def ConnectingToPrinter(print_data):
 
 btn = Button(root, text='Open image', command=open_img)
 btn.pack()
+settingsbutton = tk.Button(root, text="Open settings",
+                           command=open_settingswindow)
+settingsbutton.pack()
 
 
 def update_status_label(text):
