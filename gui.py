@@ -101,11 +101,12 @@ def open_img():
     img = Image.open(x)
     img = print2.render_image(img, False)
     temp_path = save_temp_image(img)
-    mywidth = printer_width
-
-    wpercent = (mywidth/float(img.size[1]))
+    # converts temp image to greyscale and scales it down to fit to the window
+    wpercent = (printer_width/float(img.size[1]))
     hsize = int((float(img.size[0])*float(wpercent)))
-    img = img.resize((hsize, mywidth), Image.ANTIALIAS)
+    img = ImageOps.grayscale(img)
+    img = img.convert("L")
+    img = img.resize((hsize, printer_width))
     print(img)
     img = ImageTk.PhotoImage(img)
 
