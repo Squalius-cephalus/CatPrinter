@@ -2,11 +2,14 @@ import time
 from tkinter import *
 import tkinter as tk
 from PIL import ImageTk, Image, ImageOps
-from tkinter import filedialog
+from tkinter import filedialog, messagebox
+
+import PIL
 # TODO: rename print2 to something better.
 import print2
 import tempfile
 import yaml
+import cv2
 
 
 with open("config.yaml", "r") as f:
@@ -94,11 +97,10 @@ def open_img():
     global img
     global temp_path
 
-    # TODO: Too small images with alpha channel does weird things. Scale images to bigger than printers width.
-
     x = openfn()
     img = Image.open(x)
     img = print2.render_image(img, False)
+    temp_path = save_temp_image(img)
     mywidth = printer_width
 
     wpercent = (mywidth/float(img.size[1]))
@@ -113,7 +115,6 @@ def open_img():
     panel.image = img
     panel.pack()
 
-    temp_path = save_temp_image(ImageTk.getimage(img))
     print(type(temp_path))
 
 
@@ -130,18 +131,22 @@ def ConnectingToPrinter(print_data):
     for i in range(1, 4):
         try:
             print2.connecting(print_data)
+
             set_status(f"Printing done!")
+            print_failed = False
             break
         except:
+            print_failed = True
             set_status(f"Printer not found, trying again...{i}")
             time.sleep(1)  # import time
 
-        print_failed = True
+    # TODO: Fix this, sometimes this does not fail but still sets "print_failed" true?
 
-    # TODO: Fix this, sometimes this does not fail but still sets "print_failed" true
+    if print2.lowbattery == True:
+        messagebox.showerror("Warning", "Low battery, please recharge.")
 
     if print_failed:
-        set_status(f"WARNING! Printer not found!")
+        set_status(f"Error! Printer not found!")
 
 
 btn = Button(root, text='Open image', command=open_img)

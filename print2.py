@@ -7,6 +7,7 @@ import yaml
 from bleak import BleakClient, BleakScanner
 from bleak.exc import BleakError
 
+
 import PIL.Image
 
 
@@ -20,13 +21,14 @@ printer_width = config["printer_width"]
 img_print_speed = [0x23]
 blank_speed = [0x19]
 feed_lines = config["feed_lines"]
-header_lines = 0
+header_lines = 20
 scale_feed = False
 packet_length = 60
 throttle = 0.01
 address = None
 device = None
 debug = config["debug"]
+lowbattery = False
 
 PrinterCharacteristic = "0000AE01-0000-1000-8000-00805F9B34FB"
 NotifyCharacteristic = "0000AE02-0000-1000-8000-00805F9B34FB"
@@ -125,6 +127,7 @@ def detect_printer(detected, advertisement_data):
 
 def notification_handler(sender, data):
     global debug
+    global lowbattery
     if debug:
         print("{0}: [ {1} ]".format(sender, " ".join(
             "{:02X}".format(x) for x in data)))
@@ -133,7 +136,9 @@ def notification_handler(sender, data):
         return
     if data[2] == GetDevState:
         if data[6] & 0b1000:
-            print("Warning: Low battery! Print quality might be affected…")
+            lowbattery = True
+            print(
+                "Warning: Low battery! Print quality might be affected…")
         # print("printer status byte: {:08b}".format(data[6]))
         # xxxxxxx1 no_paper ("No paper.")
         # xxxxxx10 paper_positions_open ("Warehouse.")
@@ -185,6 +190,25 @@ def blank_paper(lines):
     return blank_commands
 
 
+def remove_transparency(im, bg_colour=(255, 255, 255)):
+
+    # Only process if image has transparency (http://stackoverflow.com/a/1963146)
+    if im.mode in ('RGBA', 'LA') or (im.mode == 'P' and 'transparency' in im.info):
+
+        # Need to convert to RGBA if LA format due to a bug in PIL (http://stackoverflow.com/a/1963146)
+        alpha = im.convert('RGBA').split()[-1]
+
+        # Create a new background image of our matt color.
+        # Must be RGBA because paste requires both images have the same format
+        # (http://stackoverflow.com/a/8720632  and  http://stackoverflow.com/a/9459208)
+        bg = PIL.Image.new("RGBA", im.size, bg_colour + (255,))
+        bg.paste(im, mask=alpha)
+        return bg
+
+    else:
+        return im
+
+
 def render_image(img, printing):
     global header_lines
     global feed_lines
@@ -202,31 +226,16 @@ def render_image(img, printing):
     # not entirely sure what this does
     cmdqueue += format_message(OtherFeedPaper, img_print_speed)
 
-    if img.width > printer_width:
-        # image is wider than printer resolution; scale it down proportionately
-        scale = printer_width / img.width
-        if scale_feed:
-            header_lines = int(header_lines * scale)
-            feed_lines = int(feed_lines * scale)
-        img = img.resize((printer_width, int(img.height * scale)))
-    if img.width < (printer_width // 2):
-        # scale up to largest whole multiple
-        scale = printer_width // img.width
-        if scale_feed:
-            header_lines = int(header_lines * scale)
-            feed_lines = int(feed_lines * scale)
-        img = img.resize((img.width * scale, img.height *
-                         scale), resample=PIL.Image.NEAREST)
+    img = remove_transparency(img)
+
+    # Scale size, keep aspect ration
+    wpercent = (printer_width/float(img.size[0]))
+    hsize = int((float(img.size[1])*float(wpercent)))
+    img = img.resize((printer_width, hsize), PIL.Image.Resampling.LANCZOS)
+
     # convert image to black-and-white 1bpp color format
     img = img.convert("RGB")
     img = img.convert("1")
-    if img.width < printer_width:
-        # image is narrower than printer resolution
-        # pad it out with white pixels
-        pad_amount = (printer_width - img.width) // 2
-        padded_image = PIL.Image.new("1", (printer_width, img.height), 1)
-        padded_image.paste(img, box=(pad_amount, 0))
-        img = padded_image
 
     if header_lines:
         cmdqueue += blank_paper(header_lines)
@@ -261,19 +270,12 @@ def tulostus(filename):
 
     print_data = request_status()
     image = PIL.Image.open(filename)
-
-    try:
-        # Removes alpha-channel and replaces it with white
-        canvas = PIL.Image.new('RGBA', image.size, (255, 255, 255, 255))
-        canvas.paste(image, mask=image)
-        print_data = print_data + render_image(canvas, True)
-    except:  # If image does not have alpha channel, PIL throws an error
-        print_data = print_data + render_image(image, True)
+    print_data = print_data + render_image(image, True)
     print_data = print_data + blank_paper(feed_lines)
-
     return print_data
 
 
 def connecting(print_data):
+
     loop = asyncio.get_event_loop()
     loop.run_until_complete(connect_and_send(print_data))
