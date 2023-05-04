@@ -2,4 +2,6 @@ bluetooth_name: MX05
 contrast: 2
 debug: false
 feed_lines: 40
+header_lines: 20
 printer_width: 384
+throttle: 0.01

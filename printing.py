@@ -1,13 +1,8 @@
 #!/usr/bin/env python3
 import asyncio
-
-
 import yaml
-
 from bleak import BleakClient, BleakScanner
 from bleak.exc import BleakError
-
-
 import PIL.Image
 
 
@@ -21,10 +16,10 @@ printer_width = config["printer_width"]
 img_print_speed = [0x23]
 blank_speed = [0x19]
 feed_lines = config["feed_lines"]
-header_lines = 20
+header_lines = config["header_lines"]
 scale_feed = False
 packet_length = 60
-throttle = 0.01
+throttle = config["throttle"]
 address = None
 device = None
 debug = config["debug"]
@@ -139,6 +134,8 @@ def notification_handler(sender, data):
             lowbattery = True
             print(
                 "Warning: Low battery! Print quality might be affected…")
+
+            # TODO: Add error codes!
         # print("printer status byte: {:08b}".format(data[6]))
         # xxxxxxx1 no_paper ("No paper.")
         # xxxxxx10 paper_positions_open ("Warehouse.")
@@ -266,7 +263,7 @@ def render_image(img, printing):
         return img
 
 
-def tulostus(filename):
+def send_print_data(filename):
 
     print_data = request_status()
     image = PIL.Image.open(filename)
@@ -276,6 +273,5 @@ def tulostus(filename):
 
 
 def connecting(print_data):
-
     loop = asyncio.get_event_loop()
     loop.run_until_complete(connect_and_send(print_data))
