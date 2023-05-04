@@ -20,7 +20,9 @@ root.resizable(width=False, height=False)
 
 panel = None
 img = None
+img_original = None
 temp_path = None
+rotation = 0
 
 default_img = Image.new(
     'RGB', (printer_width, printer_width), color='gray')
@@ -32,11 +34,9 @@ icon_print = PhotoImage(file='assets/bx-printer.png')
 icon_help = PhotoImage(file="assets/bx-question-mark.png")
 icon_app = PhotoImage(file="assets/app_icon.png")
 icon_save = PhotoImage(file="assets/bx-save.png")
-
+icon_rotate = PhotoImage(file="assets/bx-rotate-right.png")
 
 helpimage = Image.open("assets/help.png")
-
-# Muuta kuva tkinter-yhteensopivaksi
 tk_helpimage = ImageTk.PhotoImage(helpimage)
 
 
@@ -107,6 +107,8 @@ def open_settingswindow():
 
 
 def open_file():
+    global rotation
+    rotation = 0
     filename = filedialog.askopenfilename(title='open')
     return filename
 
@@ -121,28 +123,48 @@ def save_temp_image(image):
         return temp.name
 
 
-def open_img():
+def open_img(rotate):
     global panel  # Access the global panel object
     global img
+    global img_original
     global temp_path
+    global rotation
+    if rotate == False:
+        openfile = open_file()
+        img_original = Image.open(openfile)
 
-    openfile = open_file()
-    img = Image.open(openfile)
+    img = img_original.rotate(-90*rotation, expand=True)
+    print(rotation)
+
     img = printing.render_image(img, False)
     temp_path = save_temp_image(img)
+
     # converts temp image to greyscale and scales it down to fit to the window
     wpercent = (printer_width/float(img.size[1]))
     hsize = int((float(img.size[0])*float(wpercent)))
+
     img = ImageOps.grayscale(img)
     img = img.convert("L")
     img = img.resize((hsize, printer_width))
+
+    if img.size[0] > printer_width:
+        hpercent = (printer_width/float(img.size[0]))
+        wsize = int((float(img.size[1])*float(hpercent)))
+        img = img.resize((printer_width, wsize))
+        img = img.convert("RGBA")
+
+        # create new empty image for preview image and paste prewiew image to it
+        newImage = Image.new(mode="RGBA", size=(printer_width, printer_width))
+        newImage.paste(img, (0, int((printer_width-img.size[1])/2)), img)
+        img = newImage
+
     print(img)
-    img = ImageTk.PhotoImage(img)
+    img2 = ImageTk.PhotoImage(img)
 
     if panel:  # If the panel object exists, destroy it
         panel.destroy()
-    panel = Label(root, image=img)
-    panel.image = img
+    panel = Label(root, image=img2)
+    panel.image = img2
     panel.pack()
 
     print(type(temp_path))
@@ -182,6 +204,21 @@ def connect_to_printer(print_data):
         set_status(f"Error! Printer not found!")
 
 
+def rotate_image():
+    global rotation
+
+    if temp_path == None:
+        messagebox.showerror("Error!", "Please load an image", icon="error")
+        return 0
+
+    rotation = rotation+1
+
+    if rotation == 4:
+        rotation = 0
+
+    open_img(True)
+
+
 def update_status_label(text):
     status_label.config(text=text)
 
@@ -203,18 +240,24 @@ root.iconphoto(False, icon_app)
 
 buttonframe = Frame(root)
 buttonframe.pack(expand=True, fill=BOTH, side="bottom")
+buttonframe2 = Frame(root)
+buttonframe2.pack(expand=True, fill=BOTH, side="bottom")
 
 settingsbutton = tk.Button(buttonframe, text="Settings", font=(
     'Helvetica 15'), image=icon_settings, height=30, width=130, compound=LEFT,
     command=open_settingswindow)
-settingsbutton.pack()
+settingsbutton.pack(side='left', anchor='e', expand=True)
 
+rotatebutton = tk.Button(buttonframe, text="Rotate", font=(
+    'Helvetica 15'), image=icon_rotate, height=30, width=130, compound=LEFT,
+    command=rotate_image)
+rotatebutton.pack(side='right', anchor='w', expand=True)
 
-openimagebutton = Button(buttonframe, text="Open image", font=(
-    'Helvetica 15'), image=icon_open, height=30, width=130, compound=LEFT, command=open_img)
+openimagebutton = Button(buttonframe2, text="Open image", font=(
+    'Helvetica 15'), image=icon_open, height=30, width=130, compound=LEFT, command=lambda: open_img(False))
 openimagebutton.pack(side='right', anchor='w', expand=True)
 
-printbutton = Button(buttonframe, text="Print image", font=(
+printbutton = Button(buttonframe2, text="Print image", font=(
     'Helvetica 15'), image=icon_print, height=30, width=130, compound=LEFT,  command=prepare_print)
 printbutton.pack(side='left', anchor='e', expand=True)
 
