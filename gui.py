@@ -31,6 +31,21 @@ icon_settings = PhotoImage(file='assets/bx-cog.png')
 icon_print = PhotoImage(file='assets/bx-printer.png')
 icon_help = PhotoImage(file="assets/bx-question-mark.png")
 icon_app = PhotoImage(file="assets/app_icon.png")
+icon_save = PhotoImage(file="assets/bx-save.png")
+
+
+helpimage = Image.open("assets/help.png")
+
+# Muuta kuva tkinter-yhteensopivaksi
+tk_helpimage = ImageTk.PhotoImage(helpimage)
+
+
+def open_helpwindow():
+    help_window = Toplevel()
+    help_window.title("Help")
+    help_window.resizable(width=False, height=False)
+    label = Label(help_window, image=tk_helpimage)
+    label.pack()
 
 
 def save_settings(device_name, contrast, feed_lines, printer_width, header_lines):
@@ -47,6 +62,9 @@ def save_settings(device_name, contrast, feed_lines, printer_width, header_lines
 
 def open_settingswindow():
     settings_window = tk.Toplevel()
+    settings_window.geometry("300x200")
+    settings_window.title("Settings")
+    settings_window.resizable(width=False, height=False)
 
     tk.Label(settings_window, text="Device name").grid(row=0)
     tk.Label(settings_window, text="Contrast").grid(row=1)
@@ -64,10 +82,6 @@ def open_settingswindow():
     printer_width.insert(0, config["printer_width"])
     header_lines = tk.Entry(settings_window)
     header_lines.insert(0, config["header_lines"])
-    save_button = tk.Button(
-        settings_window, text="Save", command=lambda: save_settings(device_name.get(), contrast.get(), feed_lines.get(), printer_width.get(), header_lines.get()))
-    exit_button = tk.Button(settings_window, text="Exit",
-                            command=settings_window.destroy)
 
     device_name.grid(row=0, column=1)
     contrast.grid(row=1, column=1)
@@ -75,8 +89,21 @@ def open_settingswindow():
     printer_width.grid(row=4, column=1)
     header_lines.grid(row=3, column=1)
 
-    save_button.grid(row=5, column=0)
-    exit_button.grid(row=5, column=1)
+    buttonframe = Frame(settings_window)
+    buttonframe.grid(row=5, column=1)
+    save_button = tk.Button(
+        buttonframe, text="Save", font=(
+            'Helvetica 15'), image=icon_save, height=30, width=70, compound=LEFT, command=lambda: save_settings(device_name.get(), contrast.get(), feed_lines.get(), printer_width.get(), header_lines.get()))
+    help_button = tk.Button(buttonframe, text="Help", font=(
+        'Helvetica 15'), image=icon_help, height=30, width=70, compound=LEFT,
+        command=open_helpwindow)
+
+    exit_button = tk.Button(buttonframe, text="Close", font=(
+        'Helvetica 15'), image=icon_settings, height=30, width=70, compound=LEFT,
+        command=settings_window.destroy)
+
+    save_button.pack(side='left', anchor='w', expand=True)
+    help_button.pack(side='right', anchor='w', expand=True)
 
 
 def open_file():
@@ -178,16 +205,17 @@ buttonframe = Frame(root)
 buttonframe.pack(expand=True, fill=BOTH, side="bottom")
 
 settingsbutton = tk.Button(buttonframe, text="Settings", font=(
-    'Helvetica 15'), image=icon_settings, height=50, width=150, compound=LEFT,
+    'Helvetica 15'), image=icon_settings, height=30, width=130, compound=LEFT,
     command=open_settingswindow)
 settingsbutton.pack()
 
+
 openimagebutton = Button(buttonframe, text="Open image", font=(
-    'Helvetica 15'), image=icon_open, height=50, width=150, compound=LEFT, command=open_img)
+    'Helvetica 15'), image=icon_open, height=30, width=130, compound=LEFT, command=open_img)
 openimagebutton.pack(side='right', anchor='w', expand=True)
 
 printbutton = Button(buttonframe, text="Print image", font=(
-    'Helvetica 15'), image=icon_print, height=50, width=150, compound=LEFT,  command=prepare_print)
+    'Helvetica 15'), image=icon_print, height=30, width=130, compound=LEFT,  command=prepare_print)
 printbutton.pack(side='left', anchor='e', expand=True)
 
 
