@@ -4,3 +4,6 @@ __pycache__/print.cpython-311.pyc
 __pycache__/print2.cpython-311.pyc
 __pycache__/tulostin.cpython-311.pyc
 .DS_Store
+__pycache__/
+__pycache__/gui.cpython-311.pyc
+__pycache__/printing.cpython-311.pyc
